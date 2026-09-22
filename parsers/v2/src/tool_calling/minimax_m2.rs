@@ -197,16 +197,33 @@ mod tests {
     }
 
     #[test]
-    fn preserves_wrapper_close_inside_parameter_value() {
-        let input = "<minimax:tool_call><invoke name=\"get_weather\"><parameter name=\"location\">Montréal </minimax:tool_call> café</parameter></invoke></minimax:tool_call>";
-        let out = parse_chunks(&weather_tools(), &[input]);
+    fn preserves_literal_wrapper_marker_in_string_argument() {
+        let tools = [Tool {
+            name: "write_file".to_string(),
+            description: None,
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string" },
+                    "content": { "type": "string" }
+                }
+            }),
+            strict: None,
+        }];
+        let input = concat!(
+            "<minimax:tool_call><invoke name=\"write_file\">",
+            "<parameter name=\"path\">example.txt</parameter>",
+            "<parameter name=\"content\">before </minimax:tool_call> after</parameter>",
+            "</invoke></minimax:tool_call>",
+        );
+        let out = parse_chunks(&tools, &[input]);
         assert_eq!(out.normal_text, "");
         let calls = out.coalesce_calls().calls;
         assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0].name.as_deref(), Some("get_weather"));
+        assert_eq!(calls[0].name.as_deref(), Some("write_file"));
         assert_eq!(
             calls[0].arguments,
-            r#"{"location":"Montréal </minimax:tool_call> café"}"#
+            r#"{"path":"example.txt","content":"before </minimax:tool_call> after"}"#
         );
     }
 
